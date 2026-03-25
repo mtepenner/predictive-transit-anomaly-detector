@@ -3,29 +3,41 @@ import json
 import pandas as pd
 import xgboost as xgb
 import warnings
-warnings.filterwarnings('ignore') # Keeps stdout clean for Node.js
+import os
+
+# Suppress warnings to keep standard output clean for Node.js
+warnings.filterwarnings('ignore')
 
 def main():
     try:
-        # 1. Catch the JSON string passed from Node.js
-        input_data = json.loads(sys.argv[1])
+        # Catch JSON string passed from Node
+        raw_input = sys.argv[1]
+        input_data = json.loads(raw_input)
         
-        # 2. Convert to DataFrame (ensure columns match your training data)
-        df = pd.DataFrame([input_data])
+        # Extract features (must match the columns in train.py exactly)
+        features = {
+            'hour_of_day': [input_data.get('hour_of_day', 12)],
+            'temp': [input_data.get('temp', 65)],
+            'prev_delay': [input_data.get('prev_delay', 0)]
+        }
         
-        # 3. Load the pre-trained model (assume train.py already generated this)
+        df = pd.DataFrame(features)
+        
+        # Load the pre-trained model
+        model_path = os.path.join(os.path.dirname(__file__), 'transit_model.json')
         model = xgb.XGBRegressor()
-        model.load_model('transit_model.json')
+        model.load_model(model_path)
         
-        # 4. Generate Anomaly/Delay Prediction
+        # Generate prediction
         prediction = model.predict(df)[0]
         
-        # 5. Print standard JSON to stdout so Node can read it
+        # Format output as JSON
         result = {
-            "station_id": input_data.get("station_id"),
+            "station_id": input_data.get("station_id", "UNKNOWN"),
             "predicted_delay_mins": float(prediction),
-            "coordinates": input_data.get("coordinates")
+            "coordinates": input_data.get("coordinates", [0, 0])
         }
+        
         print(json.dumps(result))
 
     except Exception as e:
